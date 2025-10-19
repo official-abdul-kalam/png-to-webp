@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PNG → WebP Compressor (quality=70)</title>
+  <title>PNG → WebP Compressor (Crop + Rename)</title>
+  <link rel="stylesheet" href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css">
   <style>
     :root {
       font-family: 'Inter', system-ui, sans-serif;
@@ -14,85 +15,106 @@
       --text: #e8eef8;
       --text-muted: #9aaec9;
     }
-    * {box-sizing: border-box;}
+    * { box-sizing: border-box; }
     body {
-      display: flex;align-items: center;justify-content: center;
-      min-height: 100vh;margin: 0;padding: 20px;
-      background: var(--bg-dark);color: var(--text);
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; margin: 0; padding: 20px;
+      background: var(--bg-dark); color: var(--text);
     }
     .card {
-      width: 900px;max-width: 100%;background: var(--bg-card);
-      border-radius: 16px;padding: 22px;box-shadow: 0 10px 30px rgba(0,0,0,.5);
+      width: 900px; max-width: 100%; background: var(--bg-card);
+      border-radius: 16px; padding: 22px; box-shadow: 0 10px 30px rgba(0,0,0,.5);
     }
-    h1 {font-size: 22px;margin-bottom: 6px;text-align:center;}
-    p.lead {margin: 0 0 16px;text-align:center;color: var(--text-muted);font-size:14px;}
-
+    h1 { text-align:center; font-size:22px; margin-bottom:6px; }
+    p.lead { text-align:center; margin:0 0 16px; color:var(--text-muted); font-size:14px; }
     .drop {
-      border: 2px dashed rgba(255,255,255,0.07);
-      border-radius: 12px;padding: 26px;
-      text-align: center;transition: all .3s ease;
-      background: rgba(255,255,255,0.02);
+      border:2px dashed rgba(255,255,255,0.07);
+      border-radius:12px; padding:26px; text-align:center;
+      transition:all .3s ease; background:rgba(255,255,255,0.02);
     }
-    .drop.dragover {border-color: var(--accent);background: rgba(59,130,246,0.1);}
+    .drop.dragover { border-color:var(--accent); background:rgba(59,130,246,0.1); }
     .btn {
-      background: var(--accent);color: white;border: none;
-      border-radius: 8px;padding: 8px 14px;cursor: pointer;font-size:14px;
-      transition: background .25s ease, transform .2s ease;
+      background:var(--accent); color:white; border:none; border-radius:8px;
+      padding:8px 14px; cursor:pointer; font-size:14px;
+      transition:background .25s ease, transform .2s ease;
     }
-    .btn:hover {background: var(--accent-light);transform: translateY(-1px);}
-    .info,table {width:100%;margin-top:16px;}
-    table {border-collapse: collapse;font-size:13px;overflow-x:auto;display:block;}
-    th,td {padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.05);}
-    .small{font-size:12px;color:var(--text-muted)}
-    a.link{color:var(--accent-light);text-decoration:none;transition:color .2s;}
-    a.link:hover{color:white;}
-    footer{margin-top:14px;font-size:12px;color:var(--text-muted);text-align:center;}
-    .actions a.link{display:inline-block;background:rgba(59,130,246,0.1);padding:5px 10px;border-radius:6px;margin-right:8px;transition:all .2s ease;}
-    .actions a.link:hover{background:var(--accent-light);color:#fff;}
+    .btn:hover { background:var(--accent-light); transform:translateY(-1px); }
+    .btn-secondary { background:#475569; }
+    .btn-small { font-size:13px; padding:6px 10px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; margin-top:16px; }
+    th,td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); text-align:left; }
+    footer { margin-top:14px; font-size:12px; color:var(--text-muted); text-align:center; }
 
-    /* Minimal loading animation */
-    .loading {
-      width: 14px;height: 14px;border-radius:50%;
-      border: 2px solid var(--accent-light);
-      border-top-color: transparent;
-      display:inline-block;animation: spin 1s linear infinite;
+    .actions a.link {
+      display:inline-block; background:rgba(59,130,246,0.1);
+      padding:5px 10px; border-radius:6px; margin-right:8px;
+      text-decoration:none; color:var(--accent-light);
     }
-    @keyframes spin {to {transform: rotate(360deg);}}
+    .actions a.link:hover { background:var(--accent-light); color:#fff; }
 
-    /* Responsive */
+    /* Cropper Modal */
+    #cropperModal {
+      display:none; position:fixed; top:0; left:0; width:100%; height:100%;
+      background:rgba(0,0,0,0.8); justify-content:center; align-items:center; flex-direction:column; z-index:1000;
+    }
+    #cropperModal img { max-width:80%; max-height:70%; border-radius:8px; }
+    .modal-controls {
+      margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
+    }
+    input.rename {
+      background:#111a28; border:1px solid #222; color:#fff;
+      border-radius:6px; padding:6px 10px; outline:none;
+      width:200px; font-size:14px;
+    }
     @media (max-width:600px){
-      h1{font-size:18px;}
       .card{padding:16px;}
       table,th,td{font-size:12px;}
+      #cropperModal img { max-width:95%; }
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1> PNG → WebP Compressor</h1>
-    <p class="lead">Converts PNG to WebP at <strong>quality=70</strong> — keeps original file name (only changes extension). 100% offline. Drag &amp; drop or choose files.</p>
+    <h1>PNG → WebP Compressor</h1>
+    <p class="lead">Crop (4:5), rename optional, and convert to WebP (quality=70). All client-side, no upload.</p>
 
     <div id="drop" class="drop">
       <p><strong>Drop PNG files here</strong></p>
-      <input id="fileInput" type="file" accept="image/png,image/*" multiple style="margin:10px auto;display:block;" />
-      <button id="clearBtn" class="btn" style="background:#475569">Clear</button>
-      <p class="small">Quality: 70 | Output: .webp (same name)</p>
+      <input id="fileInput" type="file" accept="image/png,image/*" multiple />
+      <button id="clearBtn" class="btn btn-secondary">Clear</button>
     </div>
 
-    <table id="table" style="display:none">
+    <table id="table" style="display:none;">
       <thead><tr><th>Original</th><th>Original size</th><th>Converted</th><th>Converted size</th><th>Actions</th></tr></thead>
       <tbody></tbody>
     </table>
 
-    <footer>Conversion is local — nothing uploaded on any server every thing is work in you browser.</footer>
+    <footer>Offline, fast & secure — now with crop + rename option ✨</footer>
   </div>
 
+  <!-- Cropper Modal -->
+  <div id="cropperModal">
+    <img id="cropImage" />
+    <div class="modal-controls">
+      <input id="renameInput" class="rename" placeholder="optional-name" pattern="[a-z0-9\-]+" />
+      <button id="startCrop" class="btn btn-small">Start Compression</button>
+      <button id="cancelCrop" class="btn btn-secondary btn-small">Cancel</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"></script>
   <script>
     const drop = document.getElementById('drop');
     const fileInput = document.getElementById('fileInput');
     const table = document.getElementById('table');
     const tbody = table.querySelector('tbody');
     const clearBtn = document.getElementById('clearBtn');
+    const cropperModal = document.getElementById('cropperModal');
+    const cropImage = document.getElementById('cropImage');
+    const renameInput = document.getElementById('renameInput');
+    const startCrop = document.getElementById('startCrop');
+    const cancelCrop = document.getElementById('cancelCrop');
+    let cropper, currentFile;
 
     function human(size){
       if(size < 1024) return size.toFixed(0)+' B';
@@ -100,54 +122,61 @@
       return (size/(1024*1024)).toFixed(2)+' MB';
     }
 
-    function handleFiles(files){
-      const arr = Array.from(files).filter(f=>f.type.startsWith('image/'));
-      if(!arr.length) return alert('Please select image files');
-      table.style.display='block';
-      arr.forEach(convertFile);
-    }
-
-    async function convertFile(file){
-      const base=file.name.replace(/\.[^.]+$/, '');
-      const outName=base+'.webp';
-      const row=document.createElement('tr');
-      row.innerHTML=`<td>${file.name}<div class='small'>${file.type}</div></td>
-      <td>${human(file.size)}</td>
-      <td id='out-${outName}'>Converting <span class='loading'></span></td>
-      <td id='outsize-${outName}'>...</td>
-      <td id='actions-${outName}'>...</td>`;
-      tbody.appendChild(row);
-
-      try{
-        const imgUrl=await readFileAsDataURL(file);
-        const img=await loadImage(imgUrl);
-        const {blob,size}=await imageToWebP(img,0.7);
-        const url=URL.createObjectURL(blob);
-        document.getElementById(`out-${outName}`).textContent=outName;
-        document.getElementById(`outsize-${outName}`).textContent=human(size);
-        const actions=document.getElementById(`actions-${outName}`);
-        const d=document.createElement('a');d.href=url;d.download=outName;d.textContent='Download';d.className='link';
-        const p=document.createElement('a');p.href=url;p.target='_blank';p.textContent='Preview';p.className='link';
-        const wrap=document.createElement('div');wrap.className='actions';wrap.appendChild(d);wrap.appendChild(p);
-        actions.appendChild(wrap);
-      }catch(e){
-        document.getElementById(`out-${outName}`).textContent='Error';
-        document.getElementById(`actions-${outName}`).textContent='Failed';
-      }
-    }
-
     function readFileAsDataURL(file){
       return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file);});
     }
-    function loadImage(dataUrl){
-      return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=dataUrl;});
-    }
-    function imageToWebP(image,quality){
-      return new Promise((res,rej)=>{
-        const c=document.createElement('canvas');c.width=image.naturalWidth;c.height=image.naturalHeight;
-        const x=c.getContext('2d');x.drawImage(image,0,0);
-        c.toBlob(b=>{if(!b)return rej();res({blob:b,size:b.size});},'image/webp',quality);
+
+    function openCropper(file){
+      currentFile = file;
+      readFileAsDataURL(file).then(data=>{
+        cropImage.src = data;
+        cropperModal.style.display='flex';
+        cropper = new Cropper(cropImage, {
+          aspectRatio: 4/5,
+          viewMode: 1,
+          autoCropArea: 1,
+          background: false,
+        });
       });
+    }
+
+    startCrop.onclick = async ()=>{
+      const canvas = cropper.getCroppedCanvas();
+      const blob = await new Promise(res=>canvas.toBlob(res,'image/webp',0.7));
+      const rename = renameInput.value.trim();
+      const safeName = rename ? rename.replace(/[^a-z0-9\-]/g,'') : currentFile.name.replace(/\.[^.]+$/, '');
+      const outName = safeName+'.webp';
+      cropper.destroy();
+      cropperModal.style.display='none';
+      renameInput.value='';
+      showResult(currentFile, blob, outName);
+    };
+
+    cancelCrop.onclick = ()=>{
+      cropper.destroy();
+      cropperModal.style.display='none';
+    };
+
+    function showResult(originalFile, blob, outName){
+      table.style.display='block';
+      const url = URL.createObjectURL(blob);
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${originalFile.name}</td>
+        <td>${human(originalFile.size)}</td>
+        <td>${outName}</td>
+        <td>${human(blob.size)}</td>
+        <td class="actions">
+          <a class="link" href="${url}" download="${outName}">Download</a>
+          <a class="link" href="${url}" target="_blank">Preview</a>
+        </td>`;
+      tbody.appendChild(row);
+    }
+
+    function handleFiles(files){
+      const arr = Array.from(files).filter(f=>f.type.startsWith('image/'));
+      if(!arr.length) return alert('Please select image files');
+      openCropper(arr[0]); // one-by-one crop process
     }
 
     ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('dragover');}));
